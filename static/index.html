@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>Test Form</title>
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+  </head>
+  <body>
+    <h1>Test Form</h1>
+    <form id="questionForm">
+      <label for="question">Question:</label><br>
+      <input type="text" id="question" name="question"><br>
+      <input type="submit" value="Submit">
+    </form>
+    <p id="response"></p>
+    <script>
+      $("#questionForm").submit(function(event) {
+        event.preventDefault();
+        var questionText = $("#question").val();
+        $.ajax({
+          url: 'http://127.0.0.1:5000/answer',
+          type: 'post',
+          dataType: 'json',
+          contentType: 'application/json',
+          success: function (data) {
+              $("#response").html(JSON.stringify(data));
+          },
+          data: JSON.stringify({ question: questionText })
+        });
+      });
+    </script>
+  </body>
+</html>
