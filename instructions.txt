@@ -1,0 +1,33 @@
+Instructions for Frontend 
+
+This document provides an overview of how to interact with the chatbot API. 
+
+1. API Base URL: 
+   
+   Once the backend server is running, it will be available at `http://localhost:8000/` if you're running it locally. For a deployed server, replace `http://localhost:8000/` with the appropriate base URL.
+
+2. Endpoints:
+
+   /ask?query=<your query>
+
+   This is a GET request that takes a `query` parameter. The query is the question you want to ask the chatbot.
+
+3. Example Usage:
+
+   To use this endpoint, append your question to the URL. For example:
+
+   http://localhost:8000/ask?query=What%20is%20the%20weather%20like%20today?
+
+   Note: The question part of the URL needs to be URL encoded. In JavaScript, you can use the built-in `encodeURIComponent()` function to achieve this.
+
+4. Response:
+
+   The response from the server will be in JSON format. Here is an example response:
+
+   {
+       "answer": "The weather today is sunny with a high of 85 degrees."
+   }
+
+   The `answer` key contains the chatbot's response to your query. 
+
+
