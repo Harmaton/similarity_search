@@ -13,15 +13,15 @@ from llama_index import (
     VectorStoreIndex,
     StorageContext,
 )
+from flask import Flask, request, jsonify
+from config import OPENAI_API_KEY
+from flask_cors import CORS
 
+app = Flask(__name__)
+CORS(app)
 
 # Load OpenAI API key
-# load_dotenv()
-# openai_api_key = os.getenv("OPENAI_API_KEY")
-
-os.environ["OPENAI_API_KEY"] = "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"
-
-openai.api_key = "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"
+openai.api_key = OPENAI_API_KEY
 
 # Configure logging
 logging.basicConfig(stream=sys.stdout, level=logging.INFO)
@@ -32,7 +32,27 @@ d = 1536
 faiss_index = faiss.IndexFlatL2(d)
 
 # Load documents
-documents = SimpleDirectoryReader("./files").load_data()
+documents = SimpleDirectoryReader("/files").load_data()
+
+
+@app.route("/ask", methods=["GET"])
+def ask():
+    query = request.args.get("query")
+
+    try:
+        document_response = get_information_from_documents(query)
+        if document_response is not None:
+            return jsonify({"response": document_response})
+    except Exception as e:
+        print(f"An error occurred while getting information from documents: {e}")
+
+    try:
+        ai_response = get_information_from_openai(query)
+        return jsonify({"response": ai_response})
+    except Exception as e:
+        print(f"An error occurred while getting information from OpenAI: {e}")
+
+    return jsonify({"response": "An error occurred, please try again."})
 
 
 def get_information_from_documents(query):
@@ -44,7 +64,7 @@ def get_information_from_documents(query):
         )
 
         # Save index to disk
-        index.storage_context.persist()
+        index.storage_context.persist("storage")
 
         # Load index from disk
         vector_store = FaissVectorStore.from_persist_dir("./storage")
@@ -66,7 +86,10 @@ def get_information_from_openai(query):
         response = openai.ChatCompletion.create(
             model="gpt-3.5-turbo",
             messages=[
-                {"role": "system", "content": "You are a helpful assistant."},
+                {
+                    "role": "system",
+                    "content": "You are a helpful assistant who understands about Paramedics and EMT basics",
+                },
                 {"role": "user", "content": query},
             ],
             max_tokens=100,
@@ -78,23 +101,5 @@ def get_information_from_openai(query):
         print(f"An error occurred while getting information from OpenAI: {e}")
 
 
-def get_information(query):
-    try:
-        document_response = get_information_from_documents(query)
-        if document_response is not None:
-            return document_response
-    except Exception as e:
-        print(f"An error occurred while getting information from documents: {e}")
-
-    try:
-        return get_information_from_openai(query)
-    except Exception as e:
-        print(f"An error occurred while getting information from OpenAI: {e}")
-
-
-query = "What does EMS do?"
-
-try:
-    print(get_information(query))
-except Exception as e:
-    print(f"An error occurred: {e}")
+if __name__ == "__main__":
+    app.run(host="0.0.0.0", debug=False)
