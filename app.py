@@ -16,9 +16,17 @@ from llama_index import (
 from flask import Flask, request, jsonify
 from config import OPENAI_API_KEY
 from flask_cors import CORS
+import firebase_admin
+from firebase_admin import credentials, firestore, auth
+from werkzeug.exceptions import BadRequest, NotFound
 
 app = Flask(__name__)
 CORS(app)
+
+# Set up Firebase
+cred = credentials.Certificate('path/to/your/firebase/credentials.json')
+firebase_admin.initialize_app(cred)
+db = firestore.client()
 
 # Load OpenAI API key
 openai.api_key = OPENAI_API_KEY
@@ -53,6 +61,136 @@ def ask():
         print(f"An error occurred while getting information from OpenAI: {e}")
 
     return jsonify({"response": "An error occurred, please try again."})
+
+
+@app.route('/user/<id>/thumbsUp', methods=['POST'])
+def thumbs_up(id):
+    try:
+        user_ref = db.collection('users').document(id)
+        user = user_ref.get()
+        if user.exists:
+            user_ref.update({'thumbsUp': firestore.Increment(1)})
+            return '', 204
+        else:
+            raise NotFound('User not found')
+    except Exception as e:
+        raise BadRequest(f"An error occurred while thumbs up: {e}")
+
+
+@app.route('/user/<id>/thumbsDown', methods=['POST'])
+def thumbs_down(id):
+    try:
+        user_ref = db.collection('users').document(id)
+        user = user_ref.get()
+        if user.exists:
+            user_ref.update({'thumbsDown': firestore.Increment(1)})
+            return '', 204
+        else:
+            raise NotFound('User not found')
+    except Exception as e:
+        raise BadRequest(f"An error occurred while thumbs down: {e}")
+
+
+@app.route('/user', methods=['POST'])
+def create_user():
+    try:
+        email = request.json.get('email')
+        password = request.json.get('password')
+        user_record = auth.create_user(
+            email=email,
+            email_verified=False,
+            password=password,
+            disabled=False
+        )
+
+        user_profile = {
+            'firstName': request.json.get('firstName'),
+            'lastName': request.json.get('lastName'),
+            'licenseLevel': request.json.get('licenseLevel'),
+            'country': request.json.get('country'),
+            'state': request.json.get('state'),
+            'localProtocol': request.json.get('localProtocol'),
+            'subscriptionInfo': request.json.get('subscriptionInfo')
+        }
+
+        db.collection('users').document(user_record.uid).set(user_profile)
+
+        return jsonify({'userId': user_record.uid}), 201
+    except Exception as e:
+        raise BadRequest(f"An error occurred while creating user: {e}")
+
+
+@app.route('/user/<id>', methods=['GET'])
+def read_user(id):
+    try:
+        user = auth.get_user(id)
+        user_profile = db.collection('users').document(id).get()
+        if user_profile.exists:
+            return jsonify(user_profile.to_dict()), 200
+        else:
+            raise NotFound('User profile not found')
+    except Exception as e:
+        raise BadRequest(f"An error occurred while reading user: {e}")
+
+
+@app.route('/user/<id>', methods=['PUT'])
+def update_user(id):
+    try:
+        user_updates = {}
+        if 'email' in request.json:
+            user_updates['email'] = request.json['email']
+        if 'password' in request.json:
+            user_updates['password'] = request.json['password']
+        user = auth.update_user(id, **user_updates)
+
+        user_profile_updates = request.json.get('userProfile')
+        db.collection('users').document(id).update(user_profile_updates)
+
+        return jsonify({'userId': user.uid}), 200
+    except Exception as e:
+        raise BadRequest(f"An error occurred while updating user: {e}")
+
+
+@app.route('/user/<id>', methods=['DELETE'])
+def delete_user(id):
+    try:
+        auth.delete_user(id)
+        db.collection('users').document(id).delete()
+        return '', 204
+    except Exception as e:
+        raise BadRequest(f"An error occurred while deleting user: {e}")
+
+
+@app.route('/sessionLogin', methods=['POST'])
+def session_login():
+    try:
+        id_token = request.json.get('idToken')
+        decoded_token = auth.verify_id_token(id_token)
+        uid = decoded_token.get('uid')
+        custom_claims = decoded_token.get('claims', {})
+        return jsonify({'uid': uid, 'customClaims': custom_claims}), 200
+    except Exception as e:
+        raise BadRequest(f"An error occurred while logging in: {e}")
+
+
+@app.route('/user/<id>/claims', methods=['POST'])
+def set_custom_user_claims(id):
+    try:
+        claims = request.json.get('claims', {})
+        auth.set_custom_user_claims(id, claims)
+        return '', 204
+    except Exception as e:
+        raise BadRequest(f"An error occurred while setting custom user claims: {e}")
+
+
+@app.route('/users', methods=['GET'])
+def list_users():
+    try:
+        users = auth.list_users().iterate_all()
+        users_list = [user.uid for user in users]
+        return jsonify(users_list), 200
+    except Exception as e:
+        raise BadRequest(f"An error occurred while listing users: {e}")
 
 
 def get_information_from_documents(query):
