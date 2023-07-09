@@ -19,6 +19,9 @@ from flask_cors import CORS
 import firebase_admin
 from firebase_admin import credentials, firestore, auth
 from werkzeug.exceptions import BadRequest, NotFound
+import os
+from PIL import Image
+from torchvision import transforms
 
 app = Flask(__name__)
 CORS(app)
@@ -38,6 +41,36 @@ logging.getLogger().addHandler(logging.StreamHandler(stream=sys.stdout))
 # Dimensions of text-ada-embedding-002
 d = 1536
 faiss_index = faiss.IndexFlatL2(d)
+
+# Specify the directory you want to use
+directory = 'path/to/your/image/folder'
+
+# List all files in the directory
+files = os.listdir(directory)
+
+# Filter the list to only include .png
+images = [file for file in files if file.endswith('.jpg')]
+
+# Open and load each image, store them in a list
+image_list = []
+for image in images:
+    with Image.open(os.path.join(directory, image)) as img:
+        image_list.append(img)
+
+
+
+# Define a transform
+transform = transforms.Compose([
+    transforms.Resize((224, 224)),
+    transforms.ToTensor(),
+    transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
+])
+
+# Apply the transform to each image
+tensor_list = [transform(img) for img in image_list]
+
+
+
 
 # Load documents
 documents = SimpleDirectoryReader("/files").load_data()
