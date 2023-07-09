@@ -153,7 +153,6 @@ def home():
 @app.route("/ask", methods=["GET"])
 def ask():
     query = request.args.get("query")
-
     try:
         document_response = get_information_from_documents(query)
         if document_response is not None:
