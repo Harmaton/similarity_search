@@ -1,13 +1,12 @@
 import openai
-import os
 import requests
 from dotenv import load_dotenv
 import logging
 import sys
 import faiss
+import numpy as np
+import pickle
 from llama_index.vector_stores.faiss import FaissVectorStore
-from IPython.display import Markdown, display
-from langchain import OpenAI
 from llama_index import (
     SimpleDirectoryReader,
     load_index_from_storage,
@@ -66,15 +65,35 @@ for file in docx_files:
 
 # Remove or replace non-string and null elements
 documents = [str(doc) if pd.notnull(doc) else '' for doc in documents]
-# Embed your documents
-document_embeddings = model.encode(documents)
+
+# Check if we already have the saved embeddings
+if os.path.exists("embeddings.pkl"):
+    # Load embeddings
+    with open("embeddings.pkl", "rb") as f:
+        document_embeddings = pickle.load(f)
+else:
+    # Embed your documents
+    document_embeddings = model.encode(documents)
+    # Save embeddings
+    with open("embeddings.pkl", "wb") as f:
+        pickle.dump(document_embeddings, f)
 
 # Dimensions of your embeddings
 d = len(document_embeddings[0])
-faiss_index = faiss.IndexFlatL2(d)
 
 
-
+# Check if we already have the saved index
+if os.path.exists("faiss_index.pkl"):
+    # Load index
+    with open("faiss_index.pkl", "rb") as f:
+        faiss_index = pickle.load(f)
+else:
+    faiss_index = faiss.IndexFlatL2(d)
+    # Add embeddings to the index
+    faiss_index.add(np.asarray(document_embeddings))
+    # Save index
+    with open("faiss_index.pkl", "wb") as f:
+        pickle.dump(faiss_index, f)
 
 
 # Specify the directory you want to use
