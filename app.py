@@ -14,7 +14,7 @@ from llama_index import (
     VectorStoreIndex,
     StorageContext,
 )
-from flask import Flask, request, jsonify
+from flask import Flask, request, jsonify, render_template
 from config import OPENAI_API_KEY
 from flask_cors import CORS
 import firebase_admin
@@ -31,7 +31,7 @@ app = Flask(__name__)
 CORS(app)
 
 # Set up Firebase
-cred = credentials.Certificate('path/to/your/firebase/credentials.json')
+cred = credentials.Certificate('./apollov1-753f04afb5d5.json')
 firebase_admin.initialize_app(cred)
 db = firestore.client()
 
@@ -50,8 +50,8 @@ logging.getLogger().addHandler(logging.StreamHandler(stream=sys.stdout))
 model = SentenceTransformer('all-MiniLM-L6-v2')
 
 # Load csv and docx files
-csv_files_dir = '/files/csv'
-docx_files_dir = '/files/docx'
+csv_files_dir = './files/EMT_BASIC'
+docx_files_dir = './files/Paramedic'
 csv_files = [f for f in os.listdir(csv_files_dir) if f.endswith('.csv')]
 docx_files = [f for f in os.listdir(docx_files_dir) if f.endswith('.docx')]
 documents = []
@@ -64,7 +64,8 @@ for file in docx_files:
     doc = Document(os.path.join(docx_files_dir, file))
     documents.extend([p.text for p in doc.paragraphs])
 
-
+# Remove or replace non-string and null elements
+documents = [str(doc) if pd.notnull(doc) else '' for doc in documents]
 # Embed your documents
 document_embeddings = model.encode(documents)
 
@@ -77,7 +78,7 @@ faiss_index = faiss.IndexFlatL2(d)
 
 
 # Specify the directory you want to use
-directory = 'files/images'
+directory = './files/images'
 
 # List all files in the directory
 files = os.listdir(directory)
@@ -101,10 +102,16 @@ transform = transforms.Compose([
 # Apply the transform to each image
 tensor_list = [transform(img) for img in image_list]
 
+
+
 # Load documents
 documents = SimpleDirectoryReader("documents").load_data()
 
 
+
+@app.route("/")
+def home():
+    return render_template("index.html")
 
 
 @app.route("/ask", methods=["GET"])

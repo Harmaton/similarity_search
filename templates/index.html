@@ -1,0 +1,26 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Sample Application</title>
+    <script>
+        function sendQuery() {
+            var query = document.getElementById('query').value;
+
+            // Send a GET request to the /ask endpoint with the query as a parameter
+            fetch('/ask?query=' + encodeURIComponent(query))
+            .then(response => response.json())
+            .then(data => {
+                // Display the response from the server
+                document.getElementById('response').innerText = data.response;
+            });
+        }
+    </script>
+</head>
+<body>
+    <h1>Ask a question:</h1>
+    <input type="text" id="query">
+    <button onclick="sendQuery()">Ask</button>
+    <h2>Response:</h2>
+    <p id="response"></p>
+</body>
+</html>
