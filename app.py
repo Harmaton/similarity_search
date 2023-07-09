@@ -6,6 +6,7 @@ import sys
 import faiss
 import numpy as np
 import pickle
+import torch
 from llama_index.vector_stores.faiss import FaissVectorStore
 from llama_index import (
     SimpleDirectoryReader,
@@ -13,7 +14,7 @@ from llama_index import (
     VectorStoreIndex,
     StorageContext,
 )
-from flask import Flask, request, jsonify, render_template
+from flask import Flask, request, jsonify, render_template,send_file
 from config import OPENAI_API_KEY
 from flask_cors import CORS
 import firebase_admin
@@ -21,13 +22,18 @@ from firebase_admin import credentials, firestore, auth
 from werkzeug.exceptions import BadRequest, NotFound
 import os
 from PIL import Image
-from torchvision import transforms
+from torchvision import datasets, transforms
 import pandas as pd
 from docx import Document
 from sentence_transformers import SentenceTransformer
+import torch.nn as nn
+from torchvision import models
+from torch import optim
+from flask_uploads import UploadSet, configure_uploads, IMAGES
+import io
 
 app = Flask(__name__)
-CORS(app)
+CORS(app, resources={r"/*": {"origins": "*"}})
 
 # Set up Firebase
 cred = credentials.Certificate('./apollov1-753f04afb5d5.json')
@@ -41,9 +47,48 @@ openai.api_key = OPENAI_API_KEY
 logging.basicConfig(stream=sys.stdout, level=logging.INFO)
 logging.getLogger().addHandler(logging.StreamHandler(stream=sys.stdout))
 
-# Dimensions of text-ada-embedding-002
-#d = 1536
-#faiss_index = faiss.IndexFlatL2(d)
+
+# Define a transform
+transform = transforms.Compose([
+    transforms.Resize((224, 224)),
+    transforms.ToTensor(),
+    transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
+])
+
+# Create an ImageFolder dataset
+dataset = datasets.ImageFolder(root='./files/images', transform=transform)
+
+# Create a DataLoader
+dataloader = torch.utils.data.DataLoader(dataset, batch_size=32, shuffle=True)
+
+# Use a pre-trained model
+model = models.resnet50(pretrained=True)
+
+# Replace the final layer to match the number of classes in your dataset
+num_classes = len(dataset.classes)
+model.fc = nn.Linear(model.fc.in_features, num_classes)
+
+# Define a loss function and an optimizer
+criterion = nn.CrossEntropyLoss()
+optimizer = optim.SGD(model.parameters(), lr=0.001, momentum=0.9)
+
+# Move the model to GPU if available
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+model.to(device)
+
+num_epochs = 50
+
+# Train the model
+for epoch in range(num_epochs):
+    for inputs, labels in dataloader:
+        inputs, labels = inputs.to(device), labels.to(device)
+
+        optimizer.zero_grad()
+        outputs = model(inputs)
+        loss = criterion(outputs, labels)
+        loss.backward()
+        optimizer.step()
+
 
 # Initialize the sentence transformer
 model = SentenceTransformer('all-MiniLM-L6-v2')
@@ -95,34 +140,6 @@ else:
     with open("faiss_index.pkl", "wb") as f:
         pickle.dump(faiss_index, f)
 
-
-# Specify the directory you want to use
-directory = './files/images'
-
-# List all files in the directory
-files = os.listdir(directory)
-
-# Filter the list to only include .png
-images = [file for file in files if file.endswith('.jpg')]
-
-# Open and load each image, store them in a list
-image_list = []
-for image in images:
-    with Image.open(os.path.join(directory, image)) as img:
-        image_list.append(img)
-
-# Define a transform
-transform = transforms.Compose([
-    transforms.Resize((224, 224)),
-    transforms.ToTensor(),
-    transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
-])
-
-# Apply the transform to each image
-tensor_list = [transform(img) for img in image_list]
-
-
-
 # Load documents
 documents = SimpleDirectoryReader("documents").load_data()
 
@@ -151,6 +168,55 @@ def ask():
         print(f"An error occurred while getting information from OpenAI: {e}")
 
     return jsonify({"response": "An error occurred, please try again."})
+
+
+photos = UploadSet('photos', IMAGES)
+app = Flask(__name__)
+app.config['UPLOADED_PHOTOS_DEST'] = 'static/img'
+configure_uploads(app, photos)
+
+
+@app.route('/upload', methods=['POST'])
+def upload():
+    if 'photo' in request.files:
+        filename = photos.save(request.files['photo'])
+        image_path = os.path.join(app.config['UPLOADED_PHOTOS_DEST'], filename)
+
+        # Open the image and convert it to a tensor
+        img = Image.open(image_path).convert('RGB')
+        img = transform(img)
+        img = img.unsqueeze(0).to(device)
+
+        # Use the model to identify the pill
+        model.eval()
+        with torch.no_grad():
+            outputs = model(img)
+
+        # Convert the output to a predicted class
+        _, preds = torch.max(outputs, 1)
+        prediction = dataset.classes[preds.item()]
+
+        # Return the prediction
+        return jsonify({'pill': prediction})
+
+    else:
+        return jsonify(success=False)
+
+
+@app.route('/get_image', methods=['GET'])
+def get_image():
+    pill_name = request.args.get('pill_name')
+
+    # Add your image directory here
+    image_dir = './files/images'
+
+    for class_folder in os.listdir(image_dir):
+        if class_folder.lower() == pill_name.lower():
+            image_folder = os.path.join(image_dir, class_folder)
+            image_path = os.path.join(image_folder, os.listdir(image_folder)[0])
+            return send_file(image_path, mimetype='image/jpeg')
+
+    return jsonify({'error': 'Pill not found'})
 
 
 @app.route('/user/<id>/thumbsUp', methods=['POST'])
