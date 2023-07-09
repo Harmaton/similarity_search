@@ -22,6 +22,9 @@ from werkzeug.exceptions import BadRequest, NotFound
 import os
 from PIL import Image
 from torchvision import transforms
+import pandas as pd
+from docx import Document
+from sentence_transformers import SentenceTransformer
 
 app = Flask(__name__)
 CORS(app)
@@ -39,8 +42,39 @@ logging.basicConfig(stream=sys.stdout, level=logging.INFO)
 logging.getLogger().addHandler(logging.StreamHandler(stream=sys.stdout))
 
 # Dimensions of text-ada-embedding-002
-d = 1536
+#d = 1536
+#faiss_index = faiss.IndexFlatL2(d)
+
+# Initialize the sentence transformer
+model = SentenceTransformer('all-MiniLM-L6-v2')
+
+# Load csv and docx files
+csv_files_dir = '/files/csv'
+docx_files_dir = '/files/docx'
+csv_files = [f for f in os.listdir(csv_files_dir) if f.endswith('.csv')]
+docx_files = [f for f in os.listdir(docx_files_dir) if f.endswith('.docx')]
+documents = []
+
+for file in csv_files:
+    df = pd.read_csv(os.path.join(csv_files_dir, file))
+    documents.extend(df.values.flatten().tolist())
+
+for file in docx_files:
+    doc = Document(os.path.join(docx_files_dir, file))
+    documents.extend([p.text for p in doc.paragraphs])
+
+# Preprocess your documents here if needed
+
+# Embed your documents
+document_embeddings = model.encode(documents)
+
+# Dimensions of your embeddings
+d = len(document_embeddings[0])
 faiss_index = faiss.IndexFlatL2(d)
+
+
+
+
 
 # Specify the directory you want to use
 directory = 'path/to/your/image/folder'
@@ -57,8 +91,6 @@ for image in images:
     with Image.open(os.path.join(directory, image)) as img:
         image_list.append(img)
 
-
-
 # Define a transform
 transform = transforms.Compose([
     transforms.Resize((224, 224)),
@@ -69,11 +101,10 @@ transform = transforms.Compose([
 # Apply the transform to each image
 tensor_list = [transform(img) for img in image_list]
 
-
-
-
 # Load documents
 documents = SimpleDirectoryReader("/files").load_data()
+
+
 
 
 @app.route("/ask", methods=["GET"])
