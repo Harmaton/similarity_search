@@ -1,5 +1,6 @@
 import openai
 import os
+import requests
 from dotenv import load_dotenv
 import logging
 import sys
@@ -63,7 +64,6 @@ for file in docx_files:
     doc = Document(os.path.join(docx_files_dir, file))
     documents.extend([p.text for p in doc.paragraphs])
 
-# Preprocess your documents here if needed
 
 # Embed your documents
 document_embeddings = model.encode(documents)
@@ -77,7 +77,7 @@ faiss_index = faiss.IndexFlatL2(d)
 
 
 # Specify the directory you want to use
-directory = 'path/to/your/image/folder'
+directory = 'files/images'
 
 # List all files in the directory
 files = os.listdir(directory)
@@ -102,7 +102,7 @@ transform = transforms.Compose([
 tensor_list = [transform(img) for img in image_list]
 
 # Load documents
-documents = SimpleDirectoryReader("/files").load_data()
+documents = SimpleDirectoryReader("documents").load_data()
 
 
 
@@ -255,6 +255,28 @@ def list_users():
         return jsonify(users_list), 200
     except Exception as e:
         raise BadRequest(f"An error occurred while listing users: {e}")
+
+@app.route("/bioc", methods=["GET"])
+def get_bioc_data():
+    # Query parameters
+    format = request.args.get("format", default="xml") # default format is XML
+    id = request.args.get("id") # PubMed ID or PMC ID
+    encoding = request.args.get("encoding", default="unicode") # default encoding is Unicode
+
+    if not id:
+        return jsonify({"error": "You must provide an ID (PubMed ID or PMC ID)."}), 400
+
+    # Construct BioC URL
+    url = f"https://www.ncbi.nlm.nih.gov/research/bionlp/RESTful/pmcoa.cgi/BioC_{format}/{id}/{encoding}"
+
+    # Send GET request to BioC API
+    response = requests.get(url)
+
+    if response.status_code != 200:
+        return jsonify({"error": "Unable to fetch data from BioC API."}), response.status_code
+
+    # Return the fetched data
+    return response.content
 
 
 def get_information_from_documents(query):
