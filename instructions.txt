@@ -1,20 +1,52 @@
-Instructions for Frontend 
+# Instructions for Frontend
 
-This document provides an overview of how to interact with the chatbot API. 
+This document provides an overview of how to interact with the chatbot API.
 
-1. API Base URL: 
-   
+1. API Base URL:
+
    Once the backend server is running, it will be available at `http://localhost:8000/` if you're running it locally. For a deployed server, replace `http://localhost:8000/` with the appropriate base URL.
 
 2. Endpoints:
 
-   /ask?query=<your query>
+   1. `/ask?query=<your query>`
 
-   This is a GET request that takes a `query` parameter. The query is the question you want to ask the chatbot.
+      This is a GET request that takes a `query` parameter. The query is the question you want to ask the chatbot.
+
+   2. `/user/<id>/thumbsUp`
+
+      This is a POST request which increases the thumbs up count of the user specified by `<id>`.
+
+   3. `/user/<id>/thumbsDown`
+
+      This is a POST request which increases the thumbs down count of the user specified by `<id>`.
+
+   4. `/user`
+
+      This is a POST request used to create a new user. The request body should include user information such as `email`, `password`, `firstName`, `lastName`, `licenseLevel`, `country`, `state`, `localProtocol`, and `subscriptionInfo`.
+
+   5. `/user/<id>`
+
+      This is a GET request which fetches the information of the user specified by `<id>`. The request can also be used with PUT and DELETE methods to update and delete user respectively.
+
+   6. `/sessionLogin`
+
+      This is a POST request used for user login. The request body should include `idToken`.
+
+   7. `/user/<id>/claims`
+
+      This is a POST request which sets custom claims for the user specified by `<id>`. The request body should include the `claims`.
+
+   8. `/users`
+
+      This is a GET request which fetches a list of all users.
+
+   9. `/bioc`
+
+      This is a GET request which fetches biomedical text in BioC format. The request should include query parameters like `format`, `id`, and `encoding`.
 
 3. Example Usage:
 
-   To use this endpoint, append your question to the URL. For example:
+   To use the ask endpoint, append your question to the URL. For example:
 
    http://localhost:8000/ask?query=What%20is%20the%20weather%20like%20today?
 
@@ -22,12 +54,11 @@ This document provides an overview of how to interact with the chatbot API.
 
 4. Response:
 
-   The response from the server will be in JSON format. Here is an example response:
+   The response from the server will be in JSON format. Here is an example response for the `/ask` endpoint:
 
    {
-       "answer": "The weather today is sunny with a high of 85 degrees."
+       "response": "The weather today is sunny with a high of 85 degrees."
    }
 
-   The `answer` key contains the chatbot's response to your query. 
-
+   The `response` key contains the chatbot's response to your query.
 
