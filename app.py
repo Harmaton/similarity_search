@@ -15,6 +15,7 @@ from llama_index import (
     StorageContext,
 )
 from flask import Flask, request, jsonify, render_template,send_file
+from werkzeug.utils import secure_filename
 from config import OPENAI_API_KEY
 from flask_cors import CORS
 import firebase_admin
@@ -30,6 +31,9 @@ import torch.nn as nn
 from torchvision import models
 from torch import optim
 from flask_uploads import UploadSet, configure_uploads, IMAGES
+from werkzeug.utils import secure_filename
+from werkzeug.datastructures import FileStorage
+
 import io
 
 app = Flask(__name__)
@@ -170,7 +174,6 @@ def ask():
 
 
 photos = UploadSet('photos', IMAGES)
-app = Flask(__name__)
 app.config['UPLOADED_PHOTOS_DEST'] = 'static/img'
 configure_uploads(app, photos)
 

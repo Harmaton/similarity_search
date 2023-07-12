@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>Test Form</title>
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+  </head>
+  <body>
+    <h1>Test Form</h1>
+    <form id="questionForm">
+      <label for="question">Question:</label><br>
+      <input type="text" id="question" name="question"><br>
+      <input type="submit" value="Submit">
+    </form>
+    <p id="response"></p>
+    <script>
+      $("#questionForm").submit(function(event) {
+        event.preventDefault();
+        var questionText = $("#question").val();
+        $.ajax({
+          url: 'http://localhost:8000/ask?query=' + encodeURIComponent(questionText),
+          type: 'get',
+          dataType: 'json',
+          success: function (data) {
+              $("#response").html(data.answer);
+          },
+          error: function() {
+            $("#response").html("Error occurred while getting the response from server");
+          }
+        });
+      });
+    </script>
+  </body>
+</html>
